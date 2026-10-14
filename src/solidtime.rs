@@ -151,7 +151,9 @@ impl Solidtime {
 
     /// The currently running entry, or `Ok(None)` when no timer is active.
     pub async fn active(&self) -> Result<Option<Value>> {
-        let value = self.get("/api/v1/users/me/time-entries/active", &[]).await?;
+        let value = self
+            .get("/api/v1/users/me/time-entries/active", &[])
+            .await?;
         if value.is_null() {
             return Ok(None);
         }
