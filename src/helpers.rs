@@ -24,7 +24,10 @@ pub fn data_array(value: &Value) -> Vec<Value> {
 pub fn project_index(projects: &Value) -> BTreeMap<String, (String, String)> {
     let mut map = BTreeMap::new();
     for project in data_array(projects) {
-        let id = project.get("id").and_then(Value::as_str).unwrap_or_default();
+        let id = project
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let name = project
             .get("name")
             .and_then(Value::as_str)
@@ -42,10 +45,16 @@ pub fn project_index(projects: &Value) -> BTreeMap<String, (String, String)> {
 
 /// Normalize one raw time entry into a compact, Oslo-local shape.
 pub fn shape_entry(entry: &Value, projects: &BTreeMap<String, (String, String)>) -> Value {
-    let start = entry.get("start").and_then(Value::as_str).unwrap_or_default();
+    let start = entry
+        .get("start")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let end = entry.get("end").and_then(Value::as_str);
     let duration = entry.get("duration").and_then(Value::as_i64).unwrap_or(0);
-    let project_id = entry.get("project_id").and_then(Value::as_str).unwrap_or("");
+    let project_id = entry
+        .get("project_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let project_name = projects
         .get(project_id)
         .map(|(name, _)| name.clone())
@@ -95,7 +104,10 @@ pub async fn entries_between(
     let projects = project_index(&client.projects().await.map_err(err)?);
     let start_utc = t::fmt_utc(t::day_start_utc(from));
     let end_utc = t::fmt_utc(t::day_end_utc(to));
-    let raw = client.time_entries(&start_utc, &end_utc).await.map_err(err)?;
+    let raw = client
+        .time_entries(&start_utc, &end_utc)
+        .await
+        .map_err(err)?;
 
     let mut entries: Vec<Value> = data_array(&raw)
         .iter()
@@ -147,7 +159,9 @@ pub async fn events_for_day(
         let Some(created) = event.get("created_at").and_then(Value::as_str) else {
             continue;
         };
-        let Ok(dt) = t::parse_utc(created) else { continue };
+        let Ok(dt) = t::parse_utc(created) else {
+            continue;
+        };
         if dt.with_timezone(&t::OSLO).date_naive() != date {
             continue;
         }

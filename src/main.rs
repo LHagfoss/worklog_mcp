@@ -25,9 +25,9 @@ pub fn err(message: impl std::fmt::Display) -> McpError {
     McpError::internal_error(message.to_string(), None)
 }
 
-/// Return a pretty-printed JSON tool result.
+/// Return a compact JSON tool result.
 pub fn ok(value: Value) -> Result<CallToolResult, McpError> {
-    let text = serde_json::to_string_pretty(&value).map_err(err)?;
+    let text = serde_json::to_string(&value).map_err(err)?;
     Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
 }
 

@@ -29,9 +29,9 @@ fn resolve_local(naive: NaiveDateTime) -> Result<DateTime<Tz>> {
     match OSLO.from_local_datetime(&naive) {
         LocalResult::Single(dt) => Ok(dt),
         LocalResult::Ambiguous(first, _) => Ok(first),
-        LocalResult::None => bail!(
-            "local time {naive} does not exist in Europe/Oslo (daylight-saving gap)"
-        ),
+        LocalResult::None => {
+            bail!("local time {naive} does not exist in Europe/Oslo (daylight-saving gap)")
+        }
     }
 }
 
@@ -80,8 +80,7 @@ pub fn parse_utc(value: &str) -> Result<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Utc))
         .or_else(|_| {
-            NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%SZ")
-                .map(|naive| naive.and_utc())
+            NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%SZ").map(|naive| naive.and_utc())
         })
         .with_context(|| format!("invalid timestamp '{value}'"))
 }
