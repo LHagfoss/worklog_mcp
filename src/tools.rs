@@ -57,6 +57,18 @@ fn compact_schema(schema: &mut schemars::Schema) {
     }
 }
 
+/// Keep the API's paginated records and navigation metadata together.
+fn paginated_result(value: &Value, records_key: &str) -> Value {
+    let mut result = json!({
+        "pagination": {
+            "links": value.get("links").cloned().unwrap_or(Value::Null),
+            "meta": value.get("meta").cloned().unwrap_or(Value::Null),
+        }
+    });
+    result[records_key] = json!(data_array(value));
+    result
+}
+
 #[derive(Clone)]
 pub struct WorklogMcp {
     client: Solidtime,
@@ -79,6 +91,22 @@ struct RangeParams {
     start_date: String,
     /// Inclusive end date (YYYY-MM-DD), Oslo-local.
     end_date: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[schemars(transform = compact_schema)]
+struct ListTasksParams {
+    /// Project UUID from solidtime_list_projects; omit to list all visible tasks.
+    project_id: Option<String>,
+    /// 1-based page number; use pagination metadata to continue (default 1).
+    page: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[schemars(transform = compact_schema)]
+struct ListTagsParams {
+    /// 1-based page number; use pagination metadata to continue (default 1).
+    page: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -214,6 +242,38 @@ impl WorklogMcp {
             })
             .collect();
         ok(json!({ "clients": rows }))
+    }
+
+    #[tool(
+        description = "Solidtime: list visible organization tasks, optionally filtered by project UUID. Results are paginated; use the returned pagination metadata to request the next page.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn solidtime_list_tasks(
+        &self,
+        Parameters(p): Parameters<ListTasksParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let tasks = self
+            .client
+            .tasks(p.project_id.as_deref(), p.page.unwrap_or(1).max(1))
+            .await
+            .map_err(err)?;
+        ok(paginated_result(&tasks, "tasks"))
+    }
+
+    #[tool(
+        description = "Solidtime: list organization tags. Results are paginated; use the returned pagination metadata to request the next page.",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn solidtime_list_tags(
+        &self,
+        Parameters(p): Parameters<ListTagsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let tags = self
+            .client
+            .tags(p.page.unwrap_or(1).max(1))
+            .await
+            .map_err(err)?;
+        ok(paginated_result(&tags, "tags"))
     }
 
     #[tool(
@@ -571,6 +631,40 @@ mod tests {
     }
 
     #[test]
+    fn paginated_results_keep_records_and_navigation_metadata() {
+        let value = json!({
+            "data": [{ "id": "task-1", "name": "Review" }],
+            "links": { "next": "?page=2" },
+            "meta": { "current_page": 1, "last_page": 2 }
+        });
+        let result = paginated_result(&value, "tasks");
+        assert_eq!(result["tasks"][0]["id"], "task-1");
+        assert_eq!(result["pagination"]["links"]["next"], "?page=2");
+        assert_eq!(result["pagination"]["meta"]["last_page"], 2);
+    }
+
+    #[test]
+    fn paginated_results_handle_missing_api_metadata() {
+        let result = paginated_result(&json!({ "data": [] }), "tags");
+        assert_eq!(result["tags"], json!([]));
+        assert!(result["pagination"]["links"].is_null());
+        assert!(result["pagination"]["meta"].is_null());
+    }
+
+    #[test]
+    fn new_tool_params_render_optional_fields_as_scalars() {
+        let tasks_schema =
+            rmcp::handler::server::common::schema_for_input::<Parameters<ListTasksParams>>()
+                .expect("task schema");
+        assert_eq!(tasks_schema["properties"]["page"]["type"], "integer");
+        assert_eq!(tasks_schema["properties"]["project_id"]["type"], "string");
+        let tags_schema =
+            rmcp::handler::server::common::schema_for_input::<Parameters<ListTagsParams>>()
+                .expect("tag schema");
+        assert_eq!(tags_schema["properties"]["page"]["type"], "integer");
+    }
+
+    #[test]
     fn tool_failures_become_error_results() {
         let result = tool_error(err("a timer is already running; stop it first"));
         assert_eq!(result.is_error, Some(true));
@@ -592,6 +686,6 @@ mod tests {
             );
             assert_eq!(annotations.read_only_hint, Some(!writes), "{}", tool.name);
         }
-        assert_eq!(tools.len(), 14);
+        assert_eq!(tools.len(), 16);
     }
 }

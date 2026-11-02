@@ -135,6 +135,27 @@ impl Solidtime {
             .await
     }
 
+    /// Paginated organization tasks, optionally filtered to one project.
+    pub async fn tasks(&self, project_id: Option<&str>, page: u32) -> Result<Value> {
+        let (org, _) = self.context().await?;
+        let mut query = vec![("page", page.max(1).to_string())];
+        if let Some(project_id) = project_id.filter(|id| !id.trim().is_empty()) {
+            query.push(("project_id", project_id.to_string()));
+        }
+        self.get(&format!("/api/v1/organizations/{org}/tasks"), &query)
+            .await
+    }
+
+    /// Paginated organization tags.
+    pub async fn tags(&self, page: u32) -> Result<Value> {
+        let (org, _) = self.context().await?;
+        self.get(
+            &format!("/api/v1/organizations/{org}/tags"),
+            &[("page", page.max(1).to_string())],
+        )
+        .await
+    }
+
     /// Time entries in [start, end) UTC, for the current member.
     pub async fn time_entries(&self, start_utc: &str, end_utc: &str) -> Result<Value> {
         let (org, member) = self.context().await?;
