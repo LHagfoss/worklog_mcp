@@ -18,6 +18,8 @@ pattern of the other local `*_mcp` servers.
 | `solidtime_whoami` | Authenticated user + organization/member IDs (connectivity check). |
 | `solidtime_list_projects` | Projects with id, name, client_id, archived flag. |
 | `solidtime_list_clients` | Clients with id, name, archived flag. |
+| `solidtime_list_tasks` | Visible tasks, optionally filtered by project UUID; paginated. |
+| `solidtime_list_tags` | Organization tags; paginated. |
 | `solidtime_list_entries` | Time entries for one Oslo-local day (defaults to today). |
 | `solidtime_list_entries_range` | Time entries across an inclusive Oslo-local date range. |
 | `solidtime_get_active_timer` | The currently running entry, if any. |
@@ -44,7 +46,8 @@ pattern of the other local `*_mcp` servers.
 
 All input and output times are **Europe/Oslo local**. The Solidtime API requires
 UTC ISO-8601, and every conversion goes through `src/timeutil.rs` — offsets are
-never hand-computed. Daylight-saving transitions are handled.
+never hand-computed. Daylight-saving transitions are handled. Task and tag reads
+return the current API page together with its pagination links and metadata.
 
 ## Configuration
 
